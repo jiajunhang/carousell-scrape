@@ -4,10 +4,14 @@ import time
 import os
 
 from datetime import datetime as dt
-from dotenv import load_dotenv
 from bs4 import BeautifulSoup
+from dotenv import load_dotenv
+from telegram.ext import Updater, InlineQueryHandler, CommandHandler
 
-CAROUSELL_API = os.environ["CAROUSELL_API"]
+load_dotenv()
+
+CAROUSELL_API = os.environ['CAROUSELL_API']
+BOT_TOKEN = os.environ['BOT_TOKEN']
 
 class Item:
     def __init__(self, keyword, user, time, title, price, desc, condition):
@@ -89,9 +93,9 @@ def isNewItem(item):
     
     return False
 
-def update(item):
+""" def update(item):
     url = TELEGRAM_API + item.toJSON()
-    requests.get(url)
+    requests.get(url) """
 
 def printTime():
     t = time.localtime()
@@ -194,9 +198,32 @@ def format_date(ts):
     itemdate = dt.fromtimestamp(ts)
     return itemdate.strftime("%d/%m/%Y, %I:%M:%S%p")
 
+def pull_cmd(update, context):
+    args = " ".join(context.args)
+    queries = args.split(',')
+
+    for query in queries:
+        update.message.reply_text("Querying for: " + query)
+
+    results = fetch_api(queries, 3600)
+    if len(results) > 0:
+        msg = format_message(results)
+        update.message.reply_text(msg)
+    else:
+        update.message.reply_text("No results within last 1hr.")
+
+def help_cmd(update, context):
+    update.message.reply_text("Use the /pull command to extract entries that were uploaded in the last 1hr using a comma-separated query. E.g. /pull ps4, ps4 slim")
 
 def main():
-    bot_token = input("Enter bot token>")
+    updater = Updater(BOT_TOKEN)
+    dp = updater.dispatcher
+    dp.add_handler(CommandHandler('help', help_cmd))
+    dp.add_handler(CommandHandler('pull', pull_cmd))
+    updater.start_polling()
+    updater.idle()
+
+    """ bot_token = input("Enter bot token>")
     chat_id = input("Enter chat id>")
     within_time = int(input("Enter search window time (i.e. item posted within last X seconds)>"))
     alert_rate = int(input("Enter alert rate (i.e. how often to send updates to chat, in seconds)>"))
@@ -219,7 +246,7 @@ def main():
             print(msg)
             url = tele_api + msg
             requests.get(url)
-        time.sleep(alert_rate)
+        time.sleep(alert_rate) """
 
 if __name__ == "__main__":
     main()
