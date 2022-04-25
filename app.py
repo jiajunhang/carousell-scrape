@@ -185,8 +185,8 @@ def construct_payload(query):
 
 def format_message(results):
     output = ""
-    output = output + time.strftime("%d/%m/%Y, %I:%M:%S%p", time.localtime())
-    output += "\n"
+    #output = output + time.strftime("%d/%m/%Y, %I:%M:%S%p", time.localtime())
+    #output += "\n"
 
     for res in results:
         entry = res.keyword + " | " + res.user + " | " + res.title + " | " + res.price + " | " + format_date(res.time) + "\n"
@@ -215,11 +215,118 @@ def pull_cmd(update, context):
 def help_cmd(update, context):
     update.message.reply_text("Use the /pull command to extract entries that were uploaded in the last 1hr using a comma-separated query. E.g. /pull ps4, ps4 slim")
 
+def settings_cmd(update,context):
+    window = context.user_data.get('post_window', int("3600"))
+    update_interval = context.user_data.get('update_interval', int("3600"))
+    queries = context.user_data.get('queries', [])
+
+    settings = {
+        "post_window": str(window) + " seconds",
+        "update_interval": str(update_interval) + " seconds",
+        "queries": queries
+    }
+
+    update.message.reply_text(json.dumps(settings))
+
+def set_window_cmd(update, context):
+    try:
+        value = int(update.message.text.partition(' ')[2])
+        
+        if (value < 300 or value > 86400):
+            update.message.reply_text("Please input a value between 300 (5 minutes) to 86400 (1 day).")
+        else:
+            context.user_data['post_window'] = value
+            update.message.reply_text("All listings posted in the last: {} seconds will be fetched.".format(value))
+    except:
+        update.message.reply_text("Invalid input. Please only input a value between 300 (5 minutes) to 86400 (1 day).")
+    
+def set_update_interval_cmd(update, context):
+    try:
+        value = int(update.message.text.partition(' ')[2])
+        
+        if (value < 60 or value > 86400):
+            update.message.reply_text("Please input a value between 300 (5 minutes) to 86400 (1 day).")
+        else:
+            context.user_data['update_interval'] = value
+            update.message.reply_text("Update notifications will be sent every: {} seconds.".format(value))
+    except:
+        update.message.reply_text("Invalid input. Please only input a value between 300 (5 minutes) to 86400 (1 day).")
+
+def set_query_cmd(update, context):
+    try:
+        value = update.message.text.partition(' ')[2]
+        if len(value) == 0:
+            update.message.reply_text("Invalid input, please key in at least one search term.")
+        else:
+            queries = value.split(",")
+            if len(queries) > 5:
+                queries = queries[:5]
+                update.message.reply_text("More than 5 search terms detected, only first 5 will be registered.")
+            context.user_data["queries"] = queries
+            update.message.reply_text("Queries registered: {}".format(queries))
+    except:
+        update.message.reply_text("Invalid input.")
+
+
+def start_cmd(update, context):
+    print("Start cmd called by user: {}".format(update.message.chat_id))
+
+    chat_id = update.message.chat_id
+    queries = context.user_data['queries']
+    window = context.user_data.get('post_window') if context.user_data.get('post_window') else 3600
+    interval = context.user_data.get('update_interval') if context.user_data.get('update_interval') else 3600
+
+    ctx = {
+        "chat_id": chat_id,
+        "queries": queries,
+        "post_window": window
+    }
+
+    currJob = context.job_queue.run_repeating(fetch_callback, interval=interval, first=10, name=str(chat_id), context=ctx)
+    
+    context.user_data['job'] = currJob
+
+def stop_cmd(update, context):
+    job = context.user_data['job']
+    job.schedule_removal()
+
+    update.message.reply_text("Stopped fetching.")
+
+def fetch_callback(context):
+    print("[fetch_callback]")
+    chat_id = context.job.context['chat_id']
+    queries = context.job.context['queries']
+    window = context.job.context['post_window']
+
+    print("[fetch_callback] chat_id={}".format(chat_id))
+    print("[fetch_callback] len(queries)={}".format(str(len(queries))))
+    print("[fetch_callback] window={}".format(str(window)))
+
+    res = fetch_api(queries, window)
+    if len(res) > 0:
+        msg = format_message(res)
+        context.bot.send_message(chat_id, text=msg)
+    else:
+        context.bot.send_message(chat_id, text=("No results within last {} seconds.".format(window)))
+
+
+
 def main():
-    updater = Updater(BOT_TOKEN)
+    updater = Updater(BOT_TOKEN, use_context=True)
+
     dp = updater.dispatcher
     dp.add_handler(CommandHandler('help', help_cmd))
-    dp.add_handler(CommandHandler('pull', pull_cmd))
+    
+    dp.add_handler(CommandHandler('settings', settings_cmd))
+
+    dp.add_handler(CommandHandler('setwindow', set_window_cmd))
+    dp.add_handler(CommandHandler('setinterval', set_update_interval_cmd))
+    dp.add_handler(CommandHandler('setquery', set_query_cmd))
+
+    dp.add_handler(CommandHandler('start', start_cmd))
+    dp.add_handler(CommandHandler('stop', stop_cmd))
+
+    #dp.add_handler(CommandHandler('pull', pull_cmd))
     updater.start_polling()
     updater.idle()
 
