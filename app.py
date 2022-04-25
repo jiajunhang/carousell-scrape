@@ -330,30 +330,5 @@ def main():
     updater.start_polling()
     updater.idle()
 
-    """ bot_token = input("Enter bot token>")
-    chat_id = input("Enter chat id>")
-    within_time = int(input("Enter search window time (i.e. item posted within last X seconds)>"))
-    alert_rate = int(input("Enter alert rate (i.e. how often to send updates to chat, in seconds)>"))
-    queryString = input("Enter queries (if multiple, comma-separated)>")
-
-    tele_api = "https://api.telegram.org/bot{}/sendMessage?chat_id={}&text=".format(bot_token, chat_id)
-
-    queries = queryString.split(',')
-
-    print("Search window: " + str(within_time) + "s")
-    print("Alert every: " + str(alert_rate) + "s")
-    print("Queries: ")
-    print('\n'.join(map(str,queries)))
-
-    while True:
-        results = fetch_api(queries, within_time)
-
-        if len(results) > 0:
-            msg = format_message(results)
-            print(msg)
-            url = tele_api + msg
-            requests.get(url)
-        time.sleep(alert_rate) """
-
 if __name__ == "__main__":
     main()
